@@ -15,10 +15,10 @@ namespace TOKS_lab1.backend
         private const int BitsInByte = 8;
         private const byte StartStopByte = 0x55;
 
-        private const byte BitStaffingCheckMask = 0x55;
+        private const byte BitStaffingCheckMask = 0x54;
         private const byte BitStaffingAndMask = 0xFE;
         // not 0x7F, because start parsing (receiving) data from low-order bit
-        private const byte BitStaffingReplaceSymbol = 0xD5;
+        private const byte BitStaffingReplaceSymbol = 0xD4;
         private const byte GetLastBitMask = 0x01;
         private const int DataInPacketSizeInBytes = 15;
         private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 4;
