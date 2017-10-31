@@ -128,7 +128,7 @@ namespace TOKS_lab1.backend
             try
             {
                 data = ParsePacket(_receivedBuffer, out int index);
-                _receivedBuffer = _receivedBuffer.Remove(0, index - 1);
+                _receivedBuffer = _receivedBuffer.Remove(0, index);
             }
             catch (CannotFindStopSymbolException)
             {
