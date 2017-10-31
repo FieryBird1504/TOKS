@@ -18,11 +18,6 @@ namespace TOKS_lab1.backend
         private string BitStaffingSeqBeforeStaffing = "1010101";
         private string BitStaffingSeqAfterStaffing = "10101011";
 
-        private const byte BitStaffingCheckMask = 0x54;
-        private const byte BitStaffingAndMask = 0xFE;
-        // not 0x7F, because start parsing (receiving) data from low-order bit
-        private const byte BitStaffingReplaceSymbol = 0xD4;
-        private const byte GetLastBitMask = 0x01;
         private const int DataInPacketSizeInBytes = 15;
         private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 4;
         private const byte EmptyByte = 0x00;
@@ -126,7 +121,6 @@ namespace TOKS_lab1.backend
                 }
                 _receivedBuffer += (BytesToBools(new[] {(byte) received}));
             }
-            //_receivedBuffer += _serialPort.ReadExisting();
 
             _viewDebugDelegate?.Invoke(BoolsToBytes(_receivedBuffer));
 
@@ -186,7 +180,7 @@ namespace TOKS_lab1.backend
         {
             var res = inputBits;
 
-            index = 0;
+            index = inputBits.Length;
             //for (index = 0; index < (res.Count - BitsInByte + 1); ++index)
             //{
             //    var b = BoolsToBytes(res.GetRange(index, BitsInByte)).First();
