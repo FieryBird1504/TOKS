@@ -13,7 +13,10 @@ namespace TOKS_lab1.backend
     {
         private SerialPort _serialPort;
         private const int BitsInByte = 8;
-        private const byte StartStopByte = 0x55;
+        private const string StartStopByte = "01010101";
+
+        private string BitStaffingSeqBeforeStaffing = "0101010";
+        private string BitStaffingSeqAfterStaffing = "01010100";
 
         private const byte BitStaffingCheckMask = 0x54;
         private const byte BitStaffingAndMask = 0xFE;
@@ -23,7 +26,7 @@ namespace TOKS_lab1.backend
         private const int DataInPacketSizeInBytes = 15;
         private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 4;
         private const byte EmptyByte = 0x00;
-        private readonly List<bool> _receivedBuffer = new List<bool>();
+        private string _receivedBuffer = string.Empty;
 
         public byte MyId { get; set; } = 0;
         public byte PartnerId { get; set; } = 0;
@@ -103,7 +106,7 @@ namespace TOKS_lab1.backend
             if (receivedEventHandler != null)
                 _serialPort.DataReceived +=
                     delegate(object sender, SerialDataReceivedEventArgs args) { receivedEventHandler(sender, args); };
-            _receivedBuffer.Clear();
+            _receivedBuffer = string.Empty;
         }
 
         /// <summary>
@@ -121,8 +124,9 @@ namespace TOKS_lab1.backend
                     InternalLogger.Log.Info("End of the stream was read");
                     break;
                 }
-                _receivedBuffer.AddRange(BytesToBools(new[] {(byte) received}));
+                _receivedBuffer += (BytesToBools(new[] {(byte) received}));
             }
+            //_receivedBuffer += _serialPort.ReadExisting();
 
             _viewDebugDelegate?.Invoke(BoolsToBytes(_receivedBuffer));
 
@@ -130,7 +134,7 @@ namespace TOKS_lab1.backend
             try
             {
                 data = ParsePacket(_receivedBuffer, out int index);
-                _receivedBuffer.RemoveRange(0, index - 1);
+                _receivedBuffer = _receivedBuffer.Remove(0, index - 1);
             }
             catch (CannotFindStopSymbolException)
             {
@@ -139,7 +143,7 @@ namespace TOKS_lab1.backend
             }
             catch (CannotFindStartSymbolException)
             {
-                _receivedBuffer.Clear();
+                _receivedBuffer = string.Empty;
                 throw;
             }
             return data != null ? Encoding.UTF8.GetString(data.ToArray()) : "";
@@ -150,13 +154,16 @@ namespace TOKS_lab1.backend
         /// </summary>
         /// <param name="inputBytes">Bytes to convert with bit staffing</param>
         /// <returns>Converted input value</returns>
-        private IEnumerable<bool> Encode(IEnumerable<byte> inputBytes)
+        private string Encode(IEnumerable<byte> inputBytes)
         {
-            var res = BytesToBools(inputBytes).ToList();
+            var res = BytesToBools(inputBytes);
 
-            for (var i = 0; i < (res.Count - BitsInByte + 1); ++i)
+            res = res.Replace(BitStaffingSeqBeforeStaffing, BitStaffingSeqAfterStaffing);
+
+            /*
+            for (var i = 0; i < (res.Length - BitsInByte + 1); ++i)
             {
-                var b = BoolsToBytes(res.GetRange(i, BitsInByte)).First();
+                var b = BoolsToBytes(res.Substring(i, BitsInByte)).First();
                 var isFindByteToStuffing = (((b & BitStaffingAndMask) ^ BitStaffingCheckMask) == 0);
 
                 if (!isFindByteToStuffing) continue;
@@ -164,7 +171,7 @@ namespace TOKS_lab1.backend
                 //Skipping staffed 8 bits
                 i += BitsInByte - 1;
                 res.Insert(i, true);
-            }
+            }*/
 
             return res;
         }
@@ -175,30 +182,33 @@ namespace TOKS_lab1.backend
         /// <param name="inputBits">Bits to decode with bit staffing</param>
         /// <param name="index">Index of first non-used element (number of used bits)</param>
         /// <returns>Decoded input value</returns>
-        private IEnumerable<bool> Decode(IEnumerable<bool> inputBits, out int index)
+        private string Decode(string inputBits, out int index)
         {
-            var res = inputBits.ToList();
+            var res = inputBits;
 
-            for (index = 0; index < (res.Count - BitsInByte + 1); ++index)
-            {
-                var b = BoolsToBytes(res.GetRange(index, BitsInByte)).First();
+            index = 0;
+            //for (index = 0; index < (res.Count - BitsInByte + 1); ++index)
+            //{
+            //    var b = BoolsToBytes(res.GetRange(index, BitsInByte)).First();
 
-                /*if (b == StartStopByte)
-                {
-                    //removing all to the end from stop symbol
-                    res.RemoveRange(index, res.Count - index);
-                    index += BitsInByte;
-                    return res;
-                }*/
-                if (b == BitStaffingReplaceSymbol)
-                {
-                    //Skipping staffed 8 bits (will be 7 after deleting bit)
-                    index += BitsInByte - 2;
-                    res.RemoveAt(index + 1);
-                }
-            }
+            //    /*if (b == StartStopByte)
+            //    {
+            //        //removing all to the end from stop symbol
+            //        res.RemoveRange(index, res.Count - index);
+            //        index += BitsInByte;
+            //        return res;
+            //    }*/
+            //    if (b == BitStaffingReplaceSymbol)
+            //    {
+            //        //Skipping staffed 8 bits (will be 7 after deleting bit)
+            //        index += BitsInByte - 2;
+            //        res.RemoveAt(index + 1);
+            //    }
+            //}
 
-            index += BitsInByte;
+            //index += BitsInByte;
+            res = res.Replace(BitStaffingSeqAfterStaffing, BitStaffingSeqBeforeStaffing);
+
             return res;
 
             //throw new CannotFindStopSymbolException();
@@ -247,7 +257,7 @@ namespace TOKS_lab1.backend
 
             var b = modifiedData.Aggregate<byte, byte>(0, (current, b1) => (byte) (current ^ b1));
             modifiedData.Add(b);
-
+            InternalLogger.Log.Debug($"FCS value: {b}");
             return modifiedData;
         }
 
@@ -267,8 +277,8 @@ namespace TOKS_lab1.backend
                 addedData.Add(EmptyByte);
             }
 
-            var encodedMeta = Encode(WrapAddressMetadata(addedData)).ToList();
-            encodedMeta.InsertRange(0, BytesToBools(new[] {StartStopByte}));
+            var encodedMeta = Encode(WrapAddressMetadata(addedData));
+            encodedMeta = encodedMeta.Insert(0, StartStopByte);
             return BoolsToBytes(encodedMeta);
         }
 
@@ -278,34 +288,23 @@ namespace TOKS_lab1.backend
         /// <param name="packet">Packet to parse</param>
         /// <param name="index">Index of first unused bool element in packet</param>
         /// <returns>Data from packet if packet addressed to me, else return null</returns>
-        private IEnumerable<byte> ParsePacket(IEnumerable<bool> packet, out int index)
+        private IEnumerable<byte> ParsePacket(string packet, out int index)
         {
-            var listedPackage = packet.ToList();
-            index = 0;
-            var isStartFound = false;
-            while (index < (listedPackage.Count - BitsInByte + 1))
-            {
-                if (BoolsToBytes(listedPackage.GetRange(index, BitsInByte)).ToArray()[0] == StartStopByte)
-                {
-                    isStartFound = true;
-                    break;
-                }
-                index++;
-            }
-            if (!isStartFound)
+            index = packet.IndexOf(StartStopByte, StringComparison.Ordinal);
+            if (index < 0)
             {
                 throw new CannotFindStartSymbolException();
             }
 
             index += BitsInByte;
-            listedPackage.RemoveRange(0, index);
+            packet = packet.Remove(0, index);
 
             int decodeIndex = 0;
-            List<bool> decoded = null;
-            for (var i = PacketSizeInBytesWithoutStartByte * BitsInByte; i <= listedPackage.Count; i++)
+            string decoded = null;
+            for (var i = PacketSizeInBytesWithoutStartByte * BitsInByte; i <= packet.Length; i++)
             {
-                var decodedInternal = Decode(listedPackage.GetRange(0, i), out decodeIndex).ToList();
-                if (PacketSizeInBytesWithoutStartByte * BitsInByte < decodedInternal.Count) break;
+                var decodedInternal = Decode(packet.Substring(0, i), out decodeIndex);
+                if (PacketSizeInBytesWithoutStartByte * BitsInByte < decodedInternal.Length) break;
                 decoded = decodedInternal;
             }
 
@@ -315,7 +314,13 @@ namespace TOKS_lab1.backend
                 return new List<byte>();
             }
 
-            var res = DeleteAddressMetadata(BoolsToBytes(decoded)).ToList();
+            var res = DeleteAddressMetadata(BoolsToBytes(decoded))?.ToList();
+            if (res == null)
+            {
+                index = 0;
+                return new List<byte>();
+            }
+
             index += decodeIndex;
             res.RemoveRange(res[0] + 1, res.Count - res[0] - 1);
             res.RemoveAt(0);
@@ -327,12 +332,21 @@ namespace TOKS_lab1.backend
         /// </summary>
         /// <param name="data">Data to convert</param>
         /// <returns>Bit array</returns>
-        private IEnumerable<bool> BytesToBools(IEnumerable<byte> data)
+        private string BytesToBools(IEnumerable<byte> data)
         {
             var bitArray = new BitArray(data.ToArray());
-            var bits = new bool[bitArray.Length];
-            bitArray.CopyTo(bits, 0);
-            return bits;
+            //var bits = new bool[bitArray.Length];
+            //bitArray.CopyTo(bits, 0);
+            //return bits;
+
+            string res = string.Empty;
+
+            foreach (bool b in bitArray)
+            {
+                res += b ? "1" : "0";
+            }
+
+            return res;
         }
 
         /// <summary>
@@ -340,9 +354,15 @@ namespace TOKS_lab1.backend
         /// </summary>
         /// <param name="data">Data to convert</param>
         /// <returns>Byte array</returns>
-        private IEnumerable<byte> BoolsToBytes(IEnumerable<bool> data)
+        private IEnumerable<byte> BoolsToBytes(string data)
         {
-            var bitArray = new BitArray(data.ToArray());
+            var bitArray = new BitArray(data.Length, false);
+
+            for (int i = 0; i < data.Length; ++i)
+            {
+                bitArray[i] = (data[i] == '1');
+            }
+
             var bytes = new byte[(bitArray.Length + BitsInByte - 1) / BitsInByte];
             bitArray.CopyTo(bytes, 0);
             return bytes;
