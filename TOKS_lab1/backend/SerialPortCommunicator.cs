@@ -273,7 +273,9 @@ namespace TOKS_lab1.backend
 
             var encodedMeta = Encode(WrapAddressMetadata(addedData));
             encodedMeta = encodedMeta.Insert(0, StartStopByte);
-            return BoolsToBytes(encodedMeta);
+            List<byte> bytes = BoolsToBytes(encodedMeta).ToList();
+            bytes.Add(0);
+            return bytes;
         }
 
         /// <summary>
@@ -293,16 +295,11 @@ namespace TOKS_lab1.backend
             index += BitsInByte;
             packet = packet.Remove(0, index);
 
-            int decodeIndex = 0;
-            string decoded = null;
-            for (var i = PacketSizeInBytesWithoutStartByte * BitsInByte; i <= packet.Length; i++)
-            {
-                var decodedInternal = Decode(packet.Substring(0, i), out decodeIndex);
-                if (PacketSizeInBytesWithoutStartByte * BitsInByte < decodedInternal.Length) break;
-                decoded = decodedInternal;
-            }
+            int indexof = packet.IndexOf(StartStopByte, StringComparison.Ordinal);
 
-            if (decoded == null)
+            string decoded = Decode(packet.Substring(0, indexof < 0 ? packet.Length : indexof), out var decodeIndex);
+
+            if (string.IsNullOrEmpty(decoded))
             {
                 index = 0;
                 return new List<byte>();
