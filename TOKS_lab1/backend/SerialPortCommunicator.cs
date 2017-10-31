@@ -13,10 +13,10 @@ namespace TOKS_lab1.backend
     {
         private SerialPort _serialPort;
         private const int BitsInByte = 8;
-        private const string StartStopByte = "01010101";
+        private const string StartStopByte = "10101010";
 
-        private string BitStaffingSeqBeforeStaffing = "0101010";
-        private string BitStaffingSeqAfterStaffing = "01010100";
+        private string BitStaffingSeqBeforeStaffing = "1010101";
+        private string BitStaffingSeqAfterStaffing = "10101011";
 
         private const byte BitStaffingCheckMask = 0x54;
         private const byte BitStaffingAndMask = 0xFE;
