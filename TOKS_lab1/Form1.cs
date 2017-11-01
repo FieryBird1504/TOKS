@@ -30,7 +30,7 @@ namespace TOKS_lab1
                     }
 
                     if (!string.IsNullOrEmpty(s2))
-                    debugTextBox.Text = s2;
+                    debugTextBox.AppendText(s2);
                     InternalLogger.Log.Debug(s2);
                 }));
             });
@@ -121,6 +121,7 @@ namespace TOKS_lab1
                             {
                                 this.Invoke((MethodInvoker) (delegate()
                                 {
+                                    debugTextBox.Clear();
                                     string s;
                                     do
                                     {
