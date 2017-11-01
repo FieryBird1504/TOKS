@@ -30,7 +30,7 @@ namespace TOKS_lab1
                     }
 
                     if (!string.IsNullOrEmpty(s2))
-                    debugTextBox.AppendText(s2 + Environment.NewLine);
+                    debugTextBox.AppendText(s2 + Environment.NewLine + Environment.NewLine);
                     InternalLogger.Log.Debug(s2);
                 }));
             });

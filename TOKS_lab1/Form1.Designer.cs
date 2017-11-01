@@ -316,13 +316,23 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.myIdNumeric.Location = new System.Drawing.Point(148, 189);
             this.myIdNumeric.Maximum = new decimal(new int[] {
-            255,
+            2,
+            0,
+            0,
+            0});
+            this.myIdNumeric.Minimum = new decimal(new int[] {
+            1,
             0,
             0,
             0});
             this.myIdNumeric.Name = "myIdNumeric";
             this.myIdNumeric.Size = new System.Drawing.Size(172, 20);
             this.myIdNumeric.TabIndex = 2;
+            this.myIdNumeric.Value = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
             // 
             // partnerIdNumeric
             // 
@@ -331,13 +341,23 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.partnerIdNumeric.Location = new System.Drawing.Point(148, 220);
             this.partnerIdNumeric.Maximum = new decimal(new int[] {
-            255,
+            2,
+            0,
+            0,
+            0});
+            this.partnerIdNumeric.Minimum = new decimal(new int[] {
+            1,
             0,
             0,
             0});
             this.partnerIdNumeric.Name = "partnerIdNumeric";
             this.partnerIdNumeric.Size = new System.Drawing.Size(172, 20);
             this.partnerIdNumeric.TabIndex = 2;
+            this.partnerIdNumeric.Value = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
             // 
             // tableLayoutPanel2
             // 
