@@ -15,8 +15,8 @@ namespace TOKS_lab1.backend
         private const int BitsInByte = 8;
         private const string StartStopByte = "10101010";
 
-        private string BitStaffingSeqBeforeStaffing = "1010101";
-        private string BitStaffingSeqAfterStaffing = "10101011";
+        private string BitStaffingSeqBeforeStaffing = "101010";
+        private string BitStaffingSeqAfterStaffing = "1010100";
 
         private const int DataInPacketSizeInBytes = 15;
         private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 4;
