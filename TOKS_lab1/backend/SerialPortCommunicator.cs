@@ -220,6 +220,8 @@ namespace TOKS_lab1.backend
             List<byte> decoded = BoolsToBytes(Decode(_receivedBuffer)).ToList();
             decoded.RemoveAll(b => b == NullByte);
 
+            _receivedBuffer = string.Empty;
+
             return Encoding.UTF8.GetString(decoded.ToArray());
         }
 
