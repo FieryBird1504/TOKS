@@ -13,13 +13,13 @@ namespace TOKS_lab1.backend
     {
         private SerialPort _serialPort;
         private const int BitsInByte = 8;
-        private const string StartStopByte = "10101010";
+        private const byte StartStopByte = 0x55;
 
         private string BitStaffingSeqBeforeStaffing = "101010";
         private string BitStaffingSeqAfterStaffing = "1010100";
 
-        private const int DataInPacketSizeInBytes = 15;
-        private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 4;
+        private const int DataInPacketSizeInBytes = 16;
+        private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 3;
         private const byte EmptyByte = 0x00;
         private string _receivedBuffer = string.Empty;
 
@@ -46,29 +46,9 @@ namespace TOKS_lab1.backend
         {
             InternalLogger.Log.Debug($"Sending string: \"{s}\"");
 
-            while (!string.IsNullOrEmpty(s))
+            foreach (byte[] bytes in SplitToPackets(s))
             {
-                var packet = new List<byte>();
-                var i = 1;
-                var olds = s;
-                for (; i <= olds.Length; i++)
-                {
-                    var maybePacket = Encoding.UTF8.GetBytes(s.Substring(0, i));
-                    if (maybePacket.Length > DataInPacketSizeInBytes)
-                    {
-                        s = olds.Substring(i - 1);
-                        break;
-                    }
-
-                    packet = maybePacket.ToList();
-                }
-
-                if (i > olds.Length)
-                {
-                    s = null;
-                }
-
-                var dataToSend = GeneratePacket(packet).ToArray();
+                var dataToSend = GeneratePacket(bytes).ToArray();
                 _serialPort.Write(dataToSend, 0, dataToSend.Length);
             }
         }
@@ -96,11 +76,11 @@ namespace TOKS_lab1.backend
             ReceivedEventHandler receivedEventHandler)
         {
             if (IsOpen) return;
-            _serialPort = new SerialPort(portName, (int) baudRate, parity, (int) dataBits, stopBits);
+            _serialPort = new SerialPort(portName, (int)baudRate, parity, (int)dataBits, stopBits);
             _serialPort.Open();
             if (receivedEventHandler != null)
                 _serialPort.DataReceived +=
-                    delegate(object sender, SerialDataReceivedEventArgs args) { receivedEventHandler(sender, args); };
+                    delegate (object sender, SerialDataReceivedEventArgs args) { receivedEventHandler(sender, args); };
             _receivedBuffer = string.Empty;
         }
 
@@ -119,7 +99,7 @@ namespace TOKS_lab1.backend
                     InternalLogger.Log.Info("End of the stream was read");
                     break;
                 }
-                _receivedBuffer += (BytesToBools(new[] {(byte) received}));
+                _receivedBuffer += (BytesToBools(new[] { (byte)received }));
             }
 
             _viewDebugDelegate?.Invoke(BoolsToBytes(_receivedBuffer));
@@ -154,19 +134,6 @@ namespace TOKS_lab1.backend
 
             res = res.Replace(BitStaffingSeqBeforeStaffing, BitStaffingSeqAfterStaffing);
 
-            /*
-            for (var i = 0; i < (res.Length - BitsInByte + 1); ++i)
-            {
-                var b = BoolsToBytes(res.Substring(i, BitsInByte)).First();
-                var isFindByteToStuffing = (((b & BitStaffingAndMask) ^ BitStaffingCheckMask) == 0);
-
-                if (!isFindByteToStuffing) continue;
-
-                //Skipping staffed 8 bits
-                i += BitsInByte - 1;
-                res.Insert(i, true);
-            }*/
-
             return res;
         }
 
@@ -181,31 +148,9 @@ namespace TOKS_lab1.backend
             var res = inputBits;
 
             index = inputBits.Length;
-            //for (index = 0; index < (res.Count - BitsInByte + 1); ++index)
-            //{
-            //    var b = BoolsToBytes(res.GetRange(index, BitsInByte)).First();
-
-            //    /*if (b == StartStopByte)
-            //    {
-            //        //removing all to the end from stop symbol
-            //        res.RemoveRange(index, res.Count - index);
-            //        index += BitsInByte;
-            //        return res;
-            //    }*/
-            //    if (b == BitStaffingReplaceSymbol)
-            //    {
-            //        //Skipping staffed 8 bits (will be 7 after deleting bit)
-            //        index += BitsInByte - 2;
-            //        res.RemoveAt(index + 1);
-            //    }
-            //}
-
-            //index += BitsInByte;
             res = res.Replace(BitStaffingSeqAfterStaffing, BitStaffingSeqBeforeStaffing);
 
             return res;
-
-            //throw new CannotFindStopSymbolException();
         }
 
         /// <summary>
@@ -226,7 +171,7 @@ namespace TOKS_lab1.backend
         private IEnumerable<byte> DeleteAddressMetadata(IEnumerable<byte> data)
         {
             var modifiedData = data.ToList();
-            var b = modifiedData.Aggregate<byte, byte>(0, (current, b1) => (byte) (current ^ b1));
+            var b = modifiedData.Aggregate<byte, byte>(0, (current, b1) => (byte)(current ^ b1));
             if (b != 0 || !IsPacketToMe(modifiedData))
             {
                 return null;
@@ -249,9 +194,6 @@ namespace TOKS_lab1.backend
             modifiedData.Insert(0, MyId);
             modifiedData.Insert(0, PartnerId);
 
-            var b = modifiedData.Aggregate<byte, byte>(0, (current, b1) => (byte) (current ^ b1));
-            modifiedData.Add(b);
-            InternalLogger.Log.Debug($"FCS value: {b}");
             return modifiedData;
         }
 
@@ -262,20 +204,24 @@ namespace TOKS_lab1.backend
         /// <returns>Generated packet</returns>
         private IEnumerable<byte> GeneratePacket(IEnumerable<byte> data)
         {
-            var addedData = data.ToList();
-            // inserting size of data
-            addedData.Insert(0, (byte) addedData.Count);
+            List<byte> package = WrapAddressMetadata(data).ToList();
+            package.Insert(0, StartStopByte);
 
-            while (addedData.Count < (DataInPacketSizeInBytes + 1))
-            {
-                addedData.Add(EmptyByte);
-            }
+            byte b = CalculateFcs(package);
+            package.Add(b);
+            InternalLogger.Log.Debug($"FCS value: {b}");
 
-            var encodedMeta = Encode(WrapAddressMetadata(addedData));
-            encodedMeta = encodedMeta.Insert(0, StartStopByte);
-            List<byte> bytes = BoolsToBytes(encodedMeta).ToList();
-            bytes.Add(0);
-            return bytes;
+            return package;
+        }
+
+        /// <summary>
+        /// Calculate Fcs info
+        /// </summary>
+        /// <param name="package">Package to calculate FCS</param>
+        /// <returns></returns>
+        private byte CalculateFcs(IEnumerable<byte> package)
+        {
+            return package.Aggregate<byte, byte>(0, (current, b1) => (byte) (current ^ b1));
         }
 
         /// <summary>
@@ -319,6 +265,22 @@ namespace TOKS_lab1.backend
         }
 
         /// <summary>
+        /// Encode & split message to packets. Need to add address, FCS & start bit to sending
+        /// </summary>
+        /// <param name="message">Message to send</param>
+        /// <returns></returns>
+        private IEnumerable<byte[]> SplitToPackets(string message)
+        {
+            string encoded = Encode(Encoding.UTF8.GetBytes(message));
+            return Enumerable
+                .Range(0, (encoded.Length + DataInPacketSizeInBytes - 1) / DataInPacketSizeInBytes)
+                .Select(i => i * DataInPacketSizeInBytes)
+                .Select(i => encoded.Substring(i, Math.Min(encoded.Length - i, DataInPacketSizeInBytes)))
+                .Select(s => s.Length != (DataInPacketSizeInBytes * BitsInByte) ? s + new string('0', DataInPacketSizeInBytes * BitsInByte - s.Length) : s)
+                .Select(s => BoolsToBytes(s).ToArray());
+        }
+
+        /// <summary>
         /// Converts byte array to bool (bit) array 
         /// </summary>
         /// <param name="data">Data to convert</param>
@@ -326,10 +288,6 @@ namespace TOKS_lab1.backend
         private string BytesToBools(IEnumerable<byte> data)
         {
             var bitArray = new BitArray(data.ToArray());
-            //var bits = new bool[bitArray.Length];
-            //bitArray.CopyTo(bits, 0);
-            //return bits;
-
             string res = string.Empty;
 
             foreach (bool b in bitArray)
