@@ -20,6 +20,7 @@ namespace TOKS_lab1.backend
 
         private const int DataInPacketSizeInBytes = 16;
         private const int PacketSizeInBytes = DataInPacketSizeInBytes + 4;
+        private const int DataInPacketSizeInBits = DataInPacketSizeInBytes * BitsInByte;
         private const int NumOfEmptyBytesInEnd = 2;
         private static readonly string EmptyLastBits = new string('0', BitsInByte * NumOfEmptyBytesInEnd);
         private static readonly string EmptyLastBytes = new string((char)NullByte, NumOfEmptyBytesInEnd);
@@ -234,10 +235,10 @@ namespace TOKS_lab1.backend
         {
             string encoded = Encode(Encoding.UTF8.GetBytes(message));
             return Enumerable
-                .Range(0, (encoded.Length + DataInPacketSizeInBytes - 1) / DataInPacketSizeInBytes)
-                .Select(i => i * DataInPacketSizeInBytes)
-                .Select(i => encoded.Substring(i, Math.Min(encoded.Length - i, DataInPacketSizeInBytes)))
-                .Select(s => s.Length != (DataInPacketSizeInBytes * BitsInByte) ? s + new string('0', DataInPacketSizeInBytes * BitsInByte - s.Length) : s)
+                .Range(0, (encoded.Length + DataInPacketSizeInBits - 1) / DataInPacketSizeInBits)
+                .Select(i => i * DataInPacketSizeInBits)
+                .Select(i => encoded.Substring(i, Math.Min(encoded.Length - i, DataInPacketSizeInBits)))
+                .Select(s => s.Length != DataInPacketSizeInBits ? s + new string('0', DataInPacketSizeInBits - s.Length) : s)
                 .Select(s => BoolsToBytes(s).ToArray());
         }
 
