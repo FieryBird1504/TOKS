@@ -19,8 +19,11 @@ namespace TOKS_lab1.backend
         private string BitStaffingSeqAfterStaffing = "1010100";
 
         private const int DataInPacketSizeInBytes = 16;
-        private const int PacketSizeInBytesWithoutStartByte = DataInPacketSizeInBytes + 3;
-        private const byte EmptyByte = 0x00;
+        private const int PacketSizeInBytes = DataInPacketSizeInBytes + 4;
+        private const int NumOfEmptyBytesInEnd = 2;
+        private static readonly string EmptyLastBits = new string('0', BitsInByte * NumOfEmptyBytesInEnd);
+        private static readonly string EmptyLastBytes = new string((char)NullByte, NumOfEmptyBytesInEnd);
+        private const byte NullByte = 0x00;
         private string _receivedBuffer = string.Empty;
 
         public byte MyId { get; set; } = 0;
@@ -29,7 +32,7 @@ namespace TOKS_lab1.backend
         public delegate void ReceivedEventHandler(object sender, EventArgs e);
         public delegate void ViewDebugDelegate(IEnumerable<byte> bytes);
 
-        private ViewDebugDelegate _viewDebugDelegate;
+        private readonly ViewDebugDelegate _viewDebugDelegate;
 
         public SerialPortCommunicator(ViewDebugDelegate viewDebugDelegate)
         {
@@ -46,7 +49,7 @@ namespace TOKS_lab1.backend
         {
             InternalLogger.Log.Debug($"Sending string: \"{s}\"");
 
-            foreach (byte[] bytes in SplitToPackets(s))
+            foreach (byte[] bytes in SplitToPackets(s + EmptyLastBytes))
             {
                 var dataToSend = GeneratePacket(bytes).ToArray();
                 _serialPort.Write(dataToSend, 0, dataToSend.Length);
@@ -90,37 +93,13 @@ namespace TOKS_lab1.backend
         /// <returns>Existing string</returns>
         public string ReadExisting()
         {
-            //Reading data from serial port
-            while (_serialPort.BytesToRead > 0)
-            {
-                var received = _serialPort.ReadByte();
-                if (received < 0)
-                {
-                    InternalLogger.Log.Info("End of the stream was read");
-                    break;
-                }
-                _receivedBuffer += (BytesToBools(new[] { (byte)received }));
-            }
+            if (_serialPort.BytesToRead < PacketSizeInBytes) return string.Empty;
 
-            _viewDebugDelegate?.Invoke(BoolsToBytes(_receivedBuffer));
+            byte[] packet = new byte[PacketSizeInBytes];
+            _serialPort.Read(packet, 0, PacketSizeInBytes);
 
-            IEnumerable<byte> data = null;
-            try
-            {
-                data = ParsePacket(_receivedBuffer, out int index);
-                _receivedBuffer = _receivedBuffer.Remove(0, index);
-            }
-            catch (CannotFindStopSymbolException)
-            {
-                //All is good
-                return "";
-            }
-            catch (CannotFindStartSymbolException)
-            {
-                _receivedBuffer = string.Empty;
-                throw;
-            }
-            return data != null ? Encoding.UTF8.GetString(data.ToArray()) : "";
+            _viewDebugDelegate?.Invoke(packet);
+            return ParsePacket(packet);
         }
 
         /// <summary>
@@ -141,13 +120,11 @@ namespace TOKS_lab1.backend
         /// Decode bit array by deletinig bit staffing
         /// </summary>
         /// <param name="inputBits">Bits to decode with bit staffing</param>
-        /// <param name="index">Index of first non-used element (number of used bits)</param>
         /// <returns>Decoded input value</returns>
-        private string Decode(string inputBits, out int index)
+        private string Decode(string inputBits)
         {
             var res = inputBits;
 
-            index = inputBits.Length;
             res = res.Replace(BitStaffingSeqAfterStaffing, BitStaffingSeqBeforeStaffing);
 
             return res;
@@ -161,25 +138,6 @@ namespace TOKS_lab1.backend
         private bool IsPacketToMe(IEnumerable<byte> packet)
         {
             return (packet.First() == MyId);
-        }
-
-        /// <summary>
-        /// Delete address metadata from data
-        /// </summary>
-        /// <param name="data">Data to delete address metadata</param>
-        /// <returns>String without address metadata if data adressed to myId, else empty array</returns>
-        private IEnumerable<byte> DeleteAddressMetadata(IEnumerable<byte> data)
-        {
-            var modifiedData = data.ToList();
-            var b = modifiedData.Aggregate<byte, byte>(0, (current, b1) => (byte)(current ^ b1));
-            if (b != 0 || !IsPacketToMe(modifiedData))
-            {
-                return null;
-            }
-
-            modifiedData.RemoveAt(modifiedData.Count - 1);
-            modifiedData.RemoveRange(0, 2);
-            return modifiedData;
         }
 
         /// <summary>
@@ -221,47 +179,48 @@ namespace TOKS_lab1.backend
         /// <returns></returns>
         private byte CalculateFcs(IEnumerable<byte> package)
         {
-            return package.Aggregate<byte, byte>(0, (current, b1) => (byte) (current ^ b1));
+            return package.Aggregate<byte, byte>(0, (current, b1) => (byte)(current ^ b1));
         }
 
         /// <summary>
         /// Parse packet
         /// </summary>
         /// <param name="packet">Packet to parse</param>
-        /// <param name="index">Index of first unused bool element in packet</param>
         /// <returns>Data from packet if packet addressed to me, else return null</returns>
-        private IEnumerable<byte> ParsePacket(string packet, out int index)
+        private string ParsePacket(IEnumerable<byte> packet)
         {
-            index = packet.IndexOf(StartStopByte, StringComparison.Ordinal);
-            if (index < 0)
+            List<byte> packageList = packet.ToList();
+            if (CalculateFcs(packageList) != 0)
             {
-                throw new CannotFindStartSymbolException();
+                InternalLogger.Log.Error("FCS was broken");
+                return string.Empty;
             }
 
-            index += BitsInByte;
-            packet = packet.Remove(0, index);
-
-            int indexof = packet.IndexOf(StartStopByte, StringComparison.Ordinal);
-
-            string decoded = Decode(packet.Substring(0, indexof < 0 ? packet.Length : indexof), out var decodeIndex);
-
-            if (string.IsNullOrEmpty(decoded))
+            //Remove FCS, SB
+            packageList.RemoveAt(packageList.Count - 1);
+            packageList.RemoveAt(0);
+            if (!IsPacketToMe(packageList))
             {
-                index = 0;
-                return new List<byte>();
+                InternalLogger.Log.Error("Package not for me");
+                return string.Empty;
             }
 
-            var res = DeleteAddressMetadata(BoolsToBytes(decoded))?.ToList();
-            if (res == null)
+            //Remove DA, SA
+            packageList.RemoveAt(0);
+            packageList.RemoveAt(0);
+
+            string bits = BytesToBools(packageList);
+            _receivedBuffer += bits;
+            if (!_receivedBuffer.Contains(EmptyLastBits))
             {
-                index = 0;
-                return new List<byte>();
+                InternalLogger.Log.Error("Not last package");
+                return string.Empty;
             }
 
-            index += decodeIndex;
-            res.RemoveRange(res[0] + 1, res.Count - res[0] - 1);
-            res.RemoveAt(0);
-            return res;
+            List<byte> decoded = BoolsToBytes(Decode(_receivedBuffer)).ToList();
+            decoded.RemoveAll(b => b == NullByte);
+
+            return Encoding.UTF8.GetString(decoded.ToArray());
         }
 
         /// <summary>

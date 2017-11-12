@@ -139,7 +139,7 @@ namespace TOKS_lab1
                             }
                             catch (Exception exception)
                             {
-                                //ShowErrorBox(exception.Message);
+                                ShowErrorBox(exception.Message);
                             }
                         });
                 }
