@@ -23,14 +23,14 @@ namespace TOKS_lab1
                 this.Invoke((MethodInvoker)(delegate ()
                 {
                     var s2 = string.Empty;
-                    foreach(var s1 in s)
+                    foreach (var s1 in s)
                     {
                         s2 += (s1.ToString());
                         s2 += ' ';
                     }
 
                     if (!string.IsNullOrEmpty(s2))
-                    debugTextBox.AppendText(s2 + Environment.NewLine + Environment.NewLine);
+                        debugTextBox.AppendText(s2 + Environment.NewLine + Environment.NewLine);
                     InternalLogger.Log.Debug(s2);
                 }));
             });
@@ -44,13 +44,13 @@ namespace TOKS_lab1
 
             foreach (var name in Enum.GetValues(typeof(EBaudrate)))
             {
-                baudrateComboBox.Items.Add((int) name);
+                baudrateComboBox.Items.Add((int)name);
             }
             baudrateComboBox.SelectedIndex = 1;
 
             foreach (var name in Enum.GetValues(typeof(EDataBits)))
             {
-                dataBitsComboBox.Items.Add((int) name);
+                dataBitsComboBox.Items.Add((int)name);
             }
             dataBitsComboBox.SelectedIndex = 3;
 
@@ -100,7 +100,7 @@ namespace TOKS_lab1
         }
 
         private void inputTextBox_TextChanged(object sender, EventArgs e)
-        {}
+        { }
 
         private void startStopButton_Click(object sender, EventArgs e)
         {
@@ -112,14 +112,14 @@ namespace TOKS_lab1
             {
                 try
                 {
-                    _serialPortCommunicator.Open((string) currentPortComboBox.SelectedItem,
-                        (EBaudrate) baudrateComboBox.SelectedItem, (Parity) parityComboBox.SelectedItem,
-                        (EDataBits) dataBitsComboBox.SelectedItem, (StopBits) stopBitsComboBox.SelectedItem,
+                    _serialPortCommunicator.Open((string)currentPortComboBox.SelectedItem,
+                        (EBaudrate)baudrateComboBox.SelectedItem, (Parity)parityComboBox.SelectedItem,
+                        (EDataBits)dataBitsComboBox.SelectedItem, (StopBits)stopBitsComboBox.SelectedItem,
                         delegate
                         {
                             try
                             {
-                                this.Invoke((MethodInvoker) (delegate()
+                                this.Invoke((MethodInvoker)(delegate ()
                                 {
                                     debugTextBox.Clear();
                                     string s;
@@ -134,7 +134,7 @@ namespace TOKS_lab1
                                         {
                                             break;
                                         }
-                                    } while (s != "");
+                                    } while (s == "");
                                 }));
                             }
                             catch (Exception exception)
