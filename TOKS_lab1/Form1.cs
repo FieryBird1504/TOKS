@@ -195,6 +195,8 @@ namespace TOKS_lab1
             {
                 if (inputTextBox.Text != "")
                 {
+                    _serialPortCommunicator.MyId = (byte) myIdNumeric.Value;
+                    _serialPortCommunicator.PartnerId = (byte) partnerIdNumeric.Value;
                     _serialPortCommunicator.Send(inputTextBox.Text);
                 }
                 inputTextBox.Text = "";
