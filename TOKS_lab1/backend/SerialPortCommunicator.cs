@@ -27,8 +27,8 @@ namespace TOKS_lab1.backend
         private const byte NullByte = 0x00;
         private string _receivedBuffer = string.Empty;
 
-        public byte MyId { get; set; } = 0;
-        public byte PartnerId { get; set; } = 0;
+        public byte MyId { get; set; } = 1;
+        public byte PartnerId { get; set; } = 1;
 
         public delegate void ReceivedEventHandler(object sender, EventArgs e);
         public delegate void ViewDebugDelegate(IEnumerable<byte> bytes);
